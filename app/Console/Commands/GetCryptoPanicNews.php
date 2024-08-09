@@ -35,14 +35,14 @@ class GetCryptoPanicNews extends Command
         ]);
 
         if ($response->status() !== 200) {
-            $this->error('Failed to fetch news from CryptoPanic');
+            $this->error(sprintf('%s Failed to fetch news from CryptoPanic', date('Y-m-d H:i:s')));
             return 1;
         }
 
         $results = $response->json('results');
 
         if (empty($results)) {
-            $this->line('Provider returned no news');
+            $this->line(sprintf('%s Provider returned no news', date('Y-m-d H:i:s')));
             return 1;
         }
 
@@ -52,7 +52,7 @@ class GetCryptoPanicNews extends Command
         });
 
         if (empty($newNews)) {
-            $this->line('No new news to store');
+            $this->line(sprintf('%s No new updates', date('Y-m-d H:i:s')));
             return 1;
         }
 
@@ -81,8 +81,8 @@ class GetCryptoPanicNews extends Command
             Redis::zAdd('news:all', 'NX', $time, $newsId);
         }
 
-        $this->line(sprintf('Stored %d new news', count($newNews)));
-        $this->info(sprintf('Total news count: %d', Redis::zCard('news:all')));
+        $this->line(sprintf('%s Stored %d new news', date('Y-m-d H:i:s'), count($newNews)));
+        $this->info(sprintf('%s Total news count: %d', date('Y-m-d H:i:s'), Redis::zCard('news:all')));
         return 0;
     }
 }
