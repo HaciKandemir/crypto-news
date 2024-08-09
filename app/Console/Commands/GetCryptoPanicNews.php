@@ -4,6 +4,7 @@ namespace App\Console\Commands;
 
 use Illuminate\Console\Command;
 use Illuminate\Support\Facades\Http;
+use Illuminate\Support\Facades\Redis;
 
 class GetCryptoPanicNews extends Command
 {
@@ -12,14 +13,14 @@ class GetCryptoPanicNews extends Command
      *
      * @var string
      */
-    protected $signature = 'app:get-crypto-panic-news';
+    protected $signature = 'get:crypto-panic-news';
 
     /**
      * The console command description.
      *
      * @var string
      */
-    protected $description = 'Command description';
+    protected $description = 'Fetch and store CryptoPanic news in Redis';
 
     /**
      * Execute the console command.
@@ -38,22 +39,50 @@ class GetCryptoPanicNews extends Command
             return 1;
         }
 
-        $results = $response->json('results', null);
+        $results = $response->json('results');
 
         if (empty($results)) {
-            $this->line('No news found');
+            $this->line('Provider returned no news');
             return 1;
         }
 
-        $news = array_map(function ($item) {
-            return [
+        // filter out news that already exists in Redis
+        $newNews = array_filter($results, function ($item) {
+            return !Redis::exists('news:'.$item['id']);
+        });
+
+        if (empty($newNews)) {
+            $this->line('No new news to store');
+            return 1;
+        }
+
+        foreach ($results as $item) {
+            $newsItem = [
+                'id' => $item['id'],
                 'title' => $item['title'],
                 'published_at' => $item['published_at'],
-                'currencies' => array_map(function ($currency) {
+                'symbols' => json_encode(array_map(function ($currency) {
                     return $currency['code'];
-                }, $item['currencies'] ?? []),
+                }, $item['currencies'] ?? [])),
             ];
-        }, $results);
 
+            $newsId = $item['id'];
+            $symbols = $item['currencies'] ?? [];
+            $time = strtotime($item['published_at']);
+
+            Redis::hMset('news:'.$newsId, $newsItem);
+
+            // Store newsId in each symbol sorted by time
+            foreach ($symbols as $symbol) {
+                Redis::zAdd('news:symbol:'.$symbol['code'], 'NX', $time, $newsId);
+            }
+
+            // Store newsId in global sorted by time
+            Redis::zAdd('news:all', 'NX', $time, $newsId);
+        }
+
+        $this->line(sprintf('Stored %d new news', count($newNews)));
+        $this->info(sprintf('Total news count: %d', Redis::zCard('news:all')));
+        return 0;
     }
 }
