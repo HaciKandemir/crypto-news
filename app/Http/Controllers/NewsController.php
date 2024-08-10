@@ -2,9 +2,10 @@
 
 namespace App\Http\Controllers;
 
+use App\Http\Requests\NewsBySymbolRequest;
+use App\Http\Requests\NewsByTimeRequest;
 use App\Services\NewsService;
 use Illuminate\Http\JsonResponse;
-use Illuminate\Http\Request;
 
 class NewsController extends Controller
 {
@@ -13,21 +14,16 @@ class NewsController extends Controller
         private readonly NewsService $newsService
     ) {}
 
-    public function searchBySymbol(Request $request): JsonResponse
+    public function searchBySymbol(NewsBySymbolRequest $request): JsonResponse
     {
-        $symbol = $request->get('symbol', 'BTC');
-        $news = $this->newsService->getNewsBySymbol($symbol);
+        $news = $this->newsService->getNewsBySymbol($request->toDTO());
 
         return response()->json($news);
     }
 
-    public function searchByTime(Request $request): JsonResponse
+    public function searchByTime(NewsByTimeRequest $request): JsonResponse
     {
-        $symbol = $request->get('symbol', '');
-        $fromDate = $request->get('fromDate', '');
-        $toDate = $request->get('toDate', '');
-
-        $news = $this->newsService->getNewsByTime($toDate, $fromDate, $symbol);
+        $news = $this->newsService->getNewsByTime($request->toDTO());
 
         return response()->json($news);
     }

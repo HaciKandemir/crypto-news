@@ -2,22 +2,25 @@
 
 namespace App\Services;
 
+use App\Dto\NewsBySymbolDto;
+use App\Dto\NewsByTimeDto;
 use Illuminate\Support\Facades\Redis;
 
 class NewsService
 {
-    public function getNewsBySymbol(string $symbol, int $pageSize = 20): array
+    public function getNewsBySymbol(NewsBySymbolDto $bySymbolDto): array
     {
-        $newsIds = Redis::zRevRange("news:symbol:$symbol", 0, $pageSize);
+        $pageSize = 20;
+        $newsIds = Redis::zRevRange("news:symbol:$bySymbolDto->symbol", 0, $pageSize);
 
         return array_map([$this, 'getNewsDetails'], $newsIds);
     }
 
-    public function getNewsByTime(string $toDate, ?string $fromDate, ?string $symbol): array
+    public function getNewsByTime(NewsByTimeDto $byTimeDto): array
     {
-        $toTime = strtotime($toDate);
-        $fromTime = empty($fromDate) ? '-inf' : strtotime($fromDate);
-        $key = !empty($symbol) ? "symbol:$symbol" : "all";
+        $toTime = $byTimeDto->toDate->getTimestamp();
+        $fromTime = empty($byTimeDto->fromDate) ? '-inf' : $byTimeDto->fromDate->getTimestamp();
+        $key = !empty($byTimeDto->symbol) ? "symbol:$byTimeDto->symbol" : "all";
 
         $newsIds = Redis::zRevRangeByScore("news:$key", $toTime, $fromTime);
 
