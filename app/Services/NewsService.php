@@ -13,7 +13,7 @@ class NewsService
         $pageSize = 20;
         $newsIds = Redis::zRevRange("news:symbol:$bySymbolDto->symbol", 0, $pageSize);
 
-        return array_map([$this, 'getNewsDetails'], $newsIds);
+        return $this->getMultipleNewsDetails($newsIds);
     }
 
     public function getNewsByTime(NewsByTimeDto $byTimeDto): array
@@ -24,7 +24,16 @@ class NewsService
 
         $newsIds = Redis::zRevRangeByScore("news:$key", $toTime, $fromTime);
 
-        return array_map([$this, 'getNewsDetails'], $newsIds);
+        return $this->getMultipleNewsDetails($newsIds);
+    }
+
+    public function getMultipleNewsDetails(array $newsIds)
+    {
+        return Redis::pipeline(function ($pipe) use ($newsIds) {
+            foreach ($newsIds as $newsId) {
+                $pipe->hGetAll("news:$newsId");
+            }
+        });
     }
 
     public function getNewsDetails(string $newsId)
