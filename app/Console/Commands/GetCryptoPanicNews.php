@@ -56,33 +56,42 @@ class GetCryptoPanicNews extends Command
             return 1;
         }
 
-        foreach ($results as $item) {
-            $newsItem = [
-                'id' => $item['id'],
-                'title' => $item['title'],
-                'published_at' => $item['published_at'],
-                'symbols' => json_encode(array_map(function ($currency) {
-                    return $currency['code'];
-                }, $item['currencies'] ?? [])),
-            ];
-
-            $newsId = $item['id'];
-            $symbols = $item['currencies'] ?? [];
-            $time = strtotime($item['published_at']);
-
-            Redis::hMset('news:'.$newsId, $newsItem);
-
-            // Store newsId in each symbol sorted by time
-            foreach ($symbols as $symbol) {
-                Redis::zAdd('news:symbol:'.$symbol['code'], 'NX', $time, $newsId);
-            }
-
-            // Store newsId in global sorted by time
-            Redis::zAdd('news:all', 'NX', $time, $newsId);
-        }
+        $this->storeNewsInRedis($newNews);
 
         $this->line(sprintf('%s Stored %d new news', date('Y-m-d H:i:s'), count($newNews)));
         $this->info(sprintf('%s Total news count: %d', date('Y-m-d H:i:s'), Redis::zCard('news:all')));
-        return 0;
+    }
+
+    /**
+     * @param array $newNews
+     * @return void
+     */
+    private function  storeNewsInRedis(array $newNews): void
+    {
+        Redis::pipeline(function ($pipe) use ($newNews) {
+            foreach ($newNews as $item) {
+                $newsItem = [
+                    'id' => $item['id'],
+                    'title' => $item['title'],
+                    'published_at' => $item['published_at'],
+                    'symbols' => json_encode(array_map(function ($currency) {
+                        return $currency['code'];
+                    }, $item['currencies'] ?? [])),
+                ];
+
+                $newsId = $item['id'];
+                $symbols = $item['currencies'] ?? [];
+                $time = strtotime($item['published_at']);
+
+                // store news item
+                $pipe->hMset('news:'.$newsId, $newsItem);
+                // store sorted newsId by time
+                $pipe->zAdd('news:all', 'NX', $time, $newsId);
+                // store newsId grouped by symbol, sorted by time
+                foreach ($symbols as $symbol) {
+                    $pipe->zAdd('news:symbol:'.$symbol['code'], 'NX', $time, $newsId);
+                }
+            }
+        });
     }
 }
