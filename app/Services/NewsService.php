@@ -29,12 +29,6 @@ class NewsService
 
     public function getNewsDetails(string $newsId)
     {
-        $item = Redis::hGetAll("news:$newsId");
-
-        if (!empty($item)) {
-            $item['symbols'] = isset($item['symbols']) ? json_decode($item['symbols'], true) : [];
-        }
-
-        return $item;
+        return Redis::hGetAll("news:$newsId");
     }
 }
