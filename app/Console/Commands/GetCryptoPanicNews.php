@@ -46,7 +46,7 @@ class GetCryptoPanicNews extends Command
             return 1;
         }
 
-        // filter out news that already exists in Redis
+        // filter already stored news
         $newNews = array_filter($results, function ($item) {
             return !Redis::exists('news:'.$item['id']);
         });
